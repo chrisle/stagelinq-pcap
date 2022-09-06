@@ -1,16 +1,24 @@
 # Notes
 
-```js
-// Decimal to hex
-[1, 2, 3, 4].map(d => d.toString(16));
+## Setup
 
-// Hex to decmial
-['11', 'aa', 'bb', 'cc'].map(h => parseInt(h, 16));
+- X1850 Mixer: `192.168.86.185` (PC port connected to LAN)
+- SC6000 Player 1: `192.168.86.201` (Port 2 on mixer)
+- SC6000 Player 2: `192.168.86.202` (Port 3 on mixer)
+- Music is on a 1TB internal SSD inside Player 1
+
+---
+
+## Reconnecting to Player After Rebooting
+
+The `StageLinqListener` is listening for messages from players. When we get a
+`DISCOVERER_HOWDY_` messages, we will try to connect to it and track the
+IP/Port so we don't try to connect to it again when we see the next
+`DISCOVERY_HOWDY_` message.
+
 ```
-
-From SC6000 to 255.255.255.255
-
-```
+Discovery packet from the SC6000 looks like this:
+UDP 192.168.86.201 => 192.168.86.255
 
 0000   ff ff ff ff ff ff 00 05 95 03 65 ec 08 00 45 00   ..........e...E.
 0010   00 82 65 02 40 00 40 11 bd f6 c0 a8 56 ca ff ff   ..e.@.@.....V...
@@ -21,44 +29,32 @@ From SC6000 to 255.255.255.255
 0060   00 52 00 45 00 52 00 5f 00 48 00 4f 00 57 00 44   .R.E.R._.H.O.W.D
 0070   00 59 00 5f 00 00 00 08 00 4a 00 50 00 31 00 33   .Y._.....J.P.1.3
 0080   00 00 00 0a 00 32 00 2e 00 33 00 2e 00 31 88 e3   .....2...3...1..
-
-Token:
-[ '82', '8b', 'eb', '02', 'da', '1f', '4e', '68', 'a6', 'af', 'b0', 'b1', '67', 'ea', 'f0', 'a2' ]
-[ 130, 139, 235, 2, 218, 31, 78, 104, 166, 175, 176, 177, 103, 234, 240, 162 ]
-
 ```
 
-Computer running Resolume Arena to 255.255.255.255
+```ts
+// We track the device like this
+private deviceId(device: ConnectionInfo) {
+  return `${device.address}:${device.port}:` +
+    `[${device.source}/${device.software.name}]`;
+}
 
+// After successully connecting to the player ...
+Logger.info(`Successfully connected to ${this.deviceId(connectionInfo)}`);
+this.discoveryStatus.set(this.deviceId(connectionInfo), ConnectionStatus.CONNECTED);
+
+// And when any discover packets come in, we ignore ones we've seen ...
+if (this.isConnected(connectionInfo)
+  || this.isConnecting(connectionInfo)
+  || this.isIgnored(connectionInfo)) return;
 ```
 
-0000   ff ff ff ff ff ff f8 75 a4 f5 1c 98 08 00 45 00   .......u......E.
-0010   00 98 db ab 00 00 80 11 47 1c c0 a8 56 e5 ff ff   ........G...V...
-0020   ff ff c8 89 c8 89 00 84 bf e2 61 69 72 44 88 fa   ..........airD..
-0030   20 99 ac 7a 4f 3f bc 16 a9 95 db da 2a 42 00 00    ..zO?......*B..
-0040   00 0e 00 63 00 68 00 72 00 69 00 73 00 6c 00 65   ...c.h.r.i.s.l.e
-0050   00 00 00 22 00 44 00 49 00 53 00 43 00 4f 00 56   ...".D.I.S.C.O.V
-0060   00 45 00 52 00 45 00 52 00 5f 00 48 00 4f 00 57   .E.R.E.R._.H.O.W
-0070   00 44 00 59 00 5f 00 00 00 1c 00 52 00 65 00 73   .D.Y._.....R.e.s
-0080   00 6f 00 6c 00 75 00 6d 00 65 00 20 00 41 00 72   .o.l.u.m.e. .A.r
-0090   00 65 00 6e 00 61 00 00 00 0a 00 37 00 2e 00 33   .e.n.a.....7...3
-00a0   00 2e 00 33 a2 d2                                 ...3..
+(Note: We're tracking the IP, port ... along with source and software name.)
 
-Token:
-[ '88', 'fa', '20', '99', 'ac', '7a', '4f', '3f', 'bc', '16', 'a9', '95', 'db', 'da', '2a', '42' ]
-[ 136, 250, 32, 153, 172, 122, 79, 63, 188, 22, 169, 149, 219, 218, 42, 66 ]
+It's important to track the IP *and* the port because every time the player
+reboots it will pick a random new port. When you reboot the player it will
+send another `DISCOVERY_HOWDY_` message with the same IP but new port.
 
-```
-
-Resolume to SC6000. What is Directory Servic?
-```
-
-0000   00 05 95 03 65 d5 f8 75 a4 f5 1c 98 08 00 45 00   ....e..u......E.
-0010   00 62 cd b7 40 00 80 06 fd de c0 a8 56 e5 c0 a8   .b..@.......V...
-0020   56 c9 d0 df a9 c7 1f 40 80 e5 d2 d2 fe 3d 50 18   V......@.....=P.
-0030   20 14 8c 04 00 00 00 00 00 00 88 fa 20 99 ac 7a    ........... ..z
-0040   4f 3f bc 16 a9 95 db da 2a 42 00 00 00 20 00 44   O?......*B... .D
-0050   00 69 00 72 00 65 00 63 00 74 00 6f 00 72 00 79   .i.r.e.c.t.o.r.y
-0060   00 53 00 65 00 72 00 76 00 69 00 63 00 65 d0 df   .S.e.r.v.i.c.e..
-
-```
+After a player reboot the `StageLinqListener` will see an IP and port we
+haven't connected to and connect it as if it were a newly discovered device on
+the network. Meaning `StageLinqListener` will automatically reconnect to
+the player after you reboot it!
