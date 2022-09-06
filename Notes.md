@@ -6,6 +6,7 @@
 - SC6000 Player 1: `192.168.86.201` (Port 2 on mixer)
 - SC6000 Player 2: `192.168.86.202` (Port 3 on mixer)
 - Music is on a 1TB internal SSD inside Player 1
+- Mixer and players get IPs via DHCP but are set with reserved IPs on the router.
 
 ---
 
