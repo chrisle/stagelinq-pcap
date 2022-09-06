@@ -7,10 +7,13 @@
 - SC6000 Player 2: `192.168.86.202` (Port 3 on mixer)
 - Music is on a 1TB internal SSD inside Player 1
 - Mixer and players get IPs via DHCP but are set with reserved IPs on the router.
+- IP address are easy to remember:
+  - .185 for the x1850 (but without the zero)
+  - .201 for player 1, .202 for player 2
 
 ---
 
-## Reconnecting to Player After Rebooting
+## Auto-Reconnecting to a Denon Device After Rebooting it
 
 The `StageLinqListener` is listening for messages from players. When we get a
 `DISCOVERER_HOWDY_` messages, we will try to connect to it and track the
@@ -33,20 +36,25 @@ UDP 192.168.86.201 => 192.168.86.255
 ```
 
 ```ts
-// We track the device like this
+// We track the device like this ...
 private deviceId(device: ConnectionInfo) {
   return `${device.address}:${device.port}:` +
     `[${device.source}/${device.software.name}]`;
 }
 
-// After successully connecting to the player ...
+// Checking if we've already connected to it before like this ...
+private isConnected(device: ConnectionInfo) {
+  return this.discoveryStatus.get(this.deviceId(device))
+    === ConnectionStatus.CONNECTED;
+}
+
+// After successully connecting to the player we add it to the map.
+const discoveryStatus: Map<string, ConnectionStatus> = new Map();
 Logger.info(`Successfully connected to ${this.deviceId(connectionInfo)}`);
 this.discoveryStatus.set(this.deviceId(connectionInfo), ConnectionStatus.CONNECTED);
 
-// And when any discover packets come in, we ignore ones we've seen ...
-if (this.isConnected(connectionInfo)
-  || this.isConnecting(connectionInfo)
-  || this.isIgnored(connectionInfo)) return;
+// Then when any discover packets come in, we ignore ones we've seen ...
+if (this.isConnected(connectionInfo)) return;
 ```
 
 (Note: We're tracking the IP, port ... along with source and software name.)
